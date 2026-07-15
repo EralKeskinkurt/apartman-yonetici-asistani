@@ -112,7 +112,7 @@ const s = StyleSheet.create({
   loadingContainer: { alignItems: 'center', paddingVertical: 48 },
   listDesktop: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   flatItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 10, marginBottom: 8 },
-  flatItemDesktop: { width: 'calc(50% - 6px)' as any, marginBottom: 0 },
+  flatItemDesktop: { width: '48%' as any, marginBottom: 0 },
   flatLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
   flatNum: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   flatNumText: { fontSize: 14, fontWeight: 'bold' },

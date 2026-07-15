@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -76,8 +76,8 @@ export default function AppNavigator() {
   const { theme } = useTheme();
   const navRef = useRef<NavigationContainerRef<any>>(null);
   const prevUserRef = useRef(user);
-  const [lastScreenLoaded, setLastScreenLoaded] = React.useState(false);
-  const [lastScreen, setLastScreen] = React.useState<string | null>(null);
+  const [lastScreenLoaded, setLastScreenLoaded] = useState(false);
+  const [lastScreen, setLastScreen] = useState<string | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem('last_screen').then((s) => {

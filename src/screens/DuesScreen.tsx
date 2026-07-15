@@ -133,7 +133,7 @@ const s = StyleSheet.create({
   flatGrid: { gap: 8 },
   flatGridDesktop: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   flatRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 10 },
-  flatRowDesktop: { width: 'calc(50% - 6px)' as any, marginBottom: 0 },
+  flatRowDesktop: { width: '48%' as any, marginBottom: 0 },
   flatInfo: { flex: 1 },
   flatNumber: { fontSize: 16, fontWeight: '600' },
   flatOwner: { fontSize: 13, marginTop: 2 },

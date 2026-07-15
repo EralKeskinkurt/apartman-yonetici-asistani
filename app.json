@@ -13,6 +13,7 @@
     "android": {
       "package": "com.apartman.asistani",
       "versionCode": 1,
+      "userInterfaceStyle": "dark",
       "adaptiveIcon": {
         "backgroundColor": "#111827",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -20,8 +21,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
-        "NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM"
+        "NOTIFICATIONS"
       ]
     },
     "web": {
@@ -35,8 +35,7 @@
           "color": "#111827"
         }
       ],
-      "expo-web-browser",
-      "expo-font"
+      "expo-web-browser"
     ],
     "extra": {
       "API_URL": "https://apartman-yonetici-asistani-production.up.railway.app/api",

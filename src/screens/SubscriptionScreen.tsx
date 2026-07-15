@@ -257,8 +257,8 @@ const s = StyleSheet.create({
   btn: { flexDirection: 'row', padding: 14, borderRadius: 8, alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
   btnText: { fontSize: 15, fontWeight: 'bold' },
   inputGroup: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, marginTop: 8, overflow: 'hidden' },
-  input: { flex: 1, paddingVertical: 12, fontSize: 15, outlineWidth: 0 },
-  cardInput: { width: '100%', padding: 12, borderRadius: 8, borderWidth: 1, fontSize: 15, marginTop: 8, outlineWidth: 0 },
+  input: { flex: 1, paddingVertical: 12, fontSize: 15 },
+  cardInput: { width: '100%', padding: 12, borderRadius: 8, borderWidth: 1, fontSize: 15, marginTop: 8 },
   expireRow: { flexDirection: 'row', gap: 6 },
   row: { flexDirection: 'row', gap: 6 },
 });
