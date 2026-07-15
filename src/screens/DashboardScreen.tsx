@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -54,12 +55,12 @@ export default function DashboardScreen() {
   useEffect(() => { load(); }, [load]);
 
   const verifyPayment = useCallback(async () => {
-    const token = localStorage.getItem('iyzico_pending_token');
-    if (!token) return;
     try {
+      const token = await AsyncStorage.getItem('iyzico_pending_token');
+      if (!token) return;
       const r = await api.payment.verify(token);
       if (r.success) {
-        localStorage.removeItem('iyzico_pending_token');
+        await AsyncStorage.removeItem('iyzico_pending_token');
         await refreshUser();
         showToast('Ödeme başarılı, abonelik aktif!', 'success');
       }
@@ -68,9 +69,11 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     verifyPayment();
-    const handler = () => verifyPayment();
-    window.addEventListener('pageshow', handler);
-    return () => window.removeEventListener('pageshow', handler);
+    if (Platform.OS === 'web') {
+      const handler = () => verifyPayment();
+      window.addEventListener('pageshow', handler);
+      return () => window.removeEventListener('pageshow', handler);
+    }
   }, [verifyPayment]);
 
   const handleCreateAnnouncement = async () => {

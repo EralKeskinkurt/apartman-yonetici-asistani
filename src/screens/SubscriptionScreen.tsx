@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useResponsive } from '../components/useResponsive';
@@ -33,12 +34,12 @@ export default function SubscriptionScreen() {
 
   const verifyPendingPayment = useCallback(async () => {
     try {
-      const storedToken = localStorage.getItem(PENDING_TOKEN_KEY);
+      const storedToken = await AsyncStorage.getItem(PENDING_TOKEN_KEY);
       if (storedToken) {
         setVerifying(true);
         const result = await api.payment.verify(storedToken);
         if (result.success) {
-          localStorage.removeItem(PENDING_TOKEN_KEY);
+          await AsyncStorage.removeItem(PENDING_TOKEN_KEY);
           showToast('Ödeme başarılı, abonelik aktif!', 'success');
           refreshUser();
           loadStatus();
@@ -55,9 +56,11 @@ export default function SubscriptionScreen() {
   useEffect(() => { 
     loadStatus(); 
     verifyPendingPayment();
-    const handler = () => verifyPendingPayment();
-    window.addEventListener('pageshow', handler);
-    return () => window.removeEventListener('pageshow', handler);
+    if (Platform.OS === 'web') {
+      const handler = () => verifyPendingPayment();
+      window.addEventListener('pageshow', handler);
+      return () => window.removeEventListener('pageshow', handler);
+    }
   }, [verifyPendingPayment]);
 
   const handlePayWithCard = async () => {
@@ -80,9 +83,13 @@ export default function SubscriptionScreen() {
         refreshUser();
         loadStatus();
       } else if (result.threeds && result.htmlContent) {
-        document.open();
-        document.write(result.htmlContent);
-        document.close();
+        if (Platform.OS === 'web') {
+          document.open();
+          document.write(result.htmlContent);
+          document.close();
+        } else {
+          showToast('3D Secure doğrulaması gerekiyor. Lütfen web üzerinden deneyin.', 'error');
+        }
       } else {
         showToast(result.error || 'Ödeme başarısız', 'error');
       }
