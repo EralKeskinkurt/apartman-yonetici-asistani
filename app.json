@@ -1,25 +1,52 @@
 {
   "expo": {
-    "name": "apartman-yonetici-asistani",
+    "name": "Apartman Asistanı",
     "slug": "apartman-yonetici-asistani",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#111827",
+      "resizeMode": "contain"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.apartman.asistani"
     },
     "android": {
+      "package": "com.apartman.asistani",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#111827",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#111827"
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "extra": {
+      "API_URL": "http://localhost:3000/api",
+      "eas": {
+        "projectId": "98b55555-911c-4b79-b16a-3af21fd5eeea"
+      }
+    },
+    "owner": "eral08"
   }
 }
