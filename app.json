@@ -42,7 +42,7 @@
       "expo-web-browser"
     ],
     "extra": {
-      "API_URL": "http://localhost:3000/api",
+      "API_URL": "https://apartman-yonetici-asistani-production.up.railway.app/api",
       "eas": {
         "projectId": "98b55555-911c-4b79-b16a-3af21fd5eeea"
       }
