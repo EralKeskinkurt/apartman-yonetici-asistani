@@ -35,16 +35,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast, showLoading, hideLoading, isLoading: !!loadingMsg }}>
       {children}
-      {toasts.map((t, i) => (
-        <View key={t.id} style={[s.toast, s[`toast${t.type}`]]}>
-          <Ionicons
-            name={t.type === 'success' ? 'checkmark-circle' : t.type === 'error' ? 'alert-circle' : 'information-circle'}
-            size={18}
-            color={t.type === 'success' ? '#059669' : t.type === 'error' ? '#dc2626' : '#2563eb'}
-          />
-          <Text style={s.toastText}>{t.message}</Text>
-        </View>
-      ))}
+      <View style={s.toastContainer} pointerEvents="box-none">
+        {toasts.map((t, i) => (
+          <View key={t.id} style={[s.toast, s[`toast${t.type}`]]}>
+            <Ionicons
+              name={t.type === 'success' ? 'checkmark-circle' : t.type === 'error' ? 'alert-circle' : 'information-circle'}
+              size={18}
+              color={t.type === 'success' ? '#059669' : t.type === 'error' ? '#dc2626' : '#2563eb'}
+            />
+            <Text style={s.toastText}>{t.message}</Text>
+          </View>
+        ))}
+      </View>
       {!!loadingMsg && (
         <View style={s.loadingOverlay}>
           <View style={s.loadingBox}>
@@ -59,11 +61,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export const useToast = () => useContext(ToastContext);
 
 const s = StyleSheet.create({
-  toast: {
+  toastContainer: {
     position: 'absolute',
     top: 60,
-    alignSelf: 'center',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
     zIndex: 9999,
+  },
+  toast: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

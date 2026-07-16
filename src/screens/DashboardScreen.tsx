@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -20,6 +21,7 @@ export default function DashboardScreen() {
   const { theme } = useTheme();
   const { isDesktop, contentMaxWidth } = useResponsive();
   const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
   const c = theme.colors;
 
   const building = useStore((s) => s.building);
@@ -227,7 +229,7 @@ export default function DashboardScreen() {
               <Text style={[s.modalTitle, { color: c.text }]}>Yeni Duyuru</Text>
               <TouchableOpacity onPress={() => setShowAnnounce(false)}><Ionicons name="close" size={24} color={c.textSecondary} /></TouchableOpacity>
             </View>
-            <View style={[s.modalBody, isDesktop && { padding: 28 }]}>
+            <View style={[s.modalBody, { paddingBottom: Math.max(20, insets.bottom + 8) }, isDesktop && { padding: 28 }]}>
               <Text style={[s.label, { color: c.textSecondary }]}>Başlık</Text>
               <TextInput style={[s.input, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} value={annTitle} onChangeText={setAnnTitle} placeholder="Duyuru başlığı" placeholderTextColor={c.textMuted} />
               <Text style={[s.label, { color: c.textSecondary }]}>İçerik</Text>

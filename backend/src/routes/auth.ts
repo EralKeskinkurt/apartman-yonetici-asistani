@@ -43,8 +43,8 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     const db = await getDatabase();
-    const existing = db.exec('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length > 0 && existing[0].values.length > 0) {
+    const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
       res.status(400).json({ error: 'Bu e-posta zaten kayıtlı' });
       return;
     }
@@ -52,12 +52,11 @@ router.post('/register', async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 12);
     const trialEnd = new Date();
     trialEnd.setDate(trialEnd.getDate() + 10);
-    db.run(
-      'INSERT INTO users (email, password, full_name, trial_end, subscription_expiry) VALUES (?, ?, ?, ?, ?)',
+    const result = await db.query(
+      'INSERT INTO users (email, password, full_name, trial_end, subscription_expiry) VALUES ($1, $2, $3, $4, $5) RETURNING id',
       [email, hashedPassword, fullName, trialEnd.toISOString(), trialEnd.toISOString()]
     );
-    const result = db.exec('SELECT last_insert_rowid()');
-    const userId = result[0].values[0][0] as number;
+    const userId = result.rows[0].id;
     saveDatabase();
 
     const token = generateToken(userId);
@@ -82,25 +81,17 @@ router.post('/login', async (req: Request, res: Response) => {
     email = sanitize(email).toLowerCase();
 
     const db = await getDatabase();
-    const result = db.exec(
-      'SELECT id, email, password, full_name, building_id, flat_id, role, subscription_tier, subscription_expiry, trial_end, picture FROM users WHERE email = ?',
+    const result = await db.query(
+      'SELECT id, email, password, full_name, building_id, flat_id, role, subscription_tier, subscription_expiry, trial_end, picture FROM users WHERE email = $1',
       [email]
     );
 
-    if (result.length === 0 || result[0].values.length === 0) {
+    if (result.rows.length === 0) {
       res.status(401).json({ error: 'E-posta veya şifre hatalı' });
       return;
     }
 
-    const row = result[0].values[0];
-    const user = {
-      id: row[0] as number, email: row[1] as string, password: row[2] as string,
-      full_name: row[3] as string, building_id: row[4] as string | null,
-      flat_id: row[5] as string | null, role: row[6] as string,
-      subscription_tier: row[7] as string,
-      subscription_expiry: row[8] as string | null, trial_end: row[9] as string | null,
-      picture: row[10] as string | undefined,
-    };
+    const user = result.rows[0];
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
@@ -140,41 +131,40 @@ router.post('/resident-register', async (req: Request, res: Response) => {
 
     const db = await getDatabase();
 
-    const buildingResult = db.exec(
-      'SELECT id, name FROM buildings WHERE invite_code = ?',
+    const buildingResult = await db.query(
+      'SELECT id, name FROM buildings WHERE invite_code = $1',
       [inviteCode.trim().toUpperCase()]
     );
-    if (!buildingResult.length || !buildingResult[0].values.length) {
+    if (buildingResult.rows.length === 0) {
       res.status(400).json({ error: 'Geçersiz davet kodu' });
       return;
     }
-    const buildingId = buildingResult[0].values[0][0] as string;
+    const buildingId = buildingResult.rows[0].id;
 
     let flatId: string | null = null;
     if (flatNumber) {
-      const flatResult = db.exec(
-        'SELECT id FROM flats WHERE building_id = ? AND number = ?',
+      const flatResult = await db.query(
+        'SELECT id FROM flats WHERE building_id = $1 AND number = $2',
         [buildingId, flatNumber]
       );
-      if (flatResult.length && flatResult[0].values.length) {
-        flatId = flatResult[0].values[0][0] as string;
-        db.run('UPDATE flats SET owner_name = ?, owner_email = ? WHERE id = ?', [fullName, email, flatId]);
+      if (flatResult.rows.length > 0) {
+        flatId = flatResult.rows[0].id;
+        await db.query('UPDATE flats SET owner_name = $1, owner_email = $2 WHERE id = $3', [fullName, email, flatId]);
       }
     }
 
-    const existing = db.exec('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length > 0 && existing[0].values.length > 0) {
+    const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
       res.status(400).json({ error: 'Bu e-posta zaten kayıtlı' });
       return;
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    db.run(
-      'INSERT INTO users (email, password, full_name, building_id, flat_id, role) VALUES (?, ?, ?, ?, ?, ?)',
+    const result = await db.query(
+      'INSERT INTO users (email, password, full_name, building_id, flat_id, role) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
       [email, hashedPassword, fullName, buildingId, flatId, 'resident']
     );
-    const result = db.exec('SELECT last_insert_rowid()');
-    const userId = result[0].values[0][0] as number;
+    const userId = result.rows[0].id;
     saveDatabase();
 
     const token = generateToken(userId);
@@ -190,18 +180,18 @@ router.post('/resident-register', async (req: Request, res: Response) => {
 router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const result = db.exec(
-      'SELECT id, email, full_name, building_id, flat_id, role, subscription_tier, subscription_expiry, trial_end, picture FROM users WHERE id = ?',
+    const result = await db.query(
+      'SELECT id, email, full_name, building_id, flat_id, role, subscription_tier, subscription_expiry, trial_end, picture FROM users WHERE id = $1',
       [req.userId]
     );
-    if (result.length === 0 || result[0].values.length === 0) {
+    if (result.rows.length === 0) {
       res.status(404).json({ error: 'Kullanıcı bulunamadı' });
       return;
     }
-    const row = result[0].values[0];
+    const row = result.rows[0];
     res.json({
-      id: row[0], email: row[1], full_name: row[2], building_id: row[3], flat_id: row[4], role: row[5],
-      subscription_tier: row[6], subscription_expiry: row[7], trial_end: row[8], picture: row[9],
+      id: row.id, email: row.email, full_name: row.full_name, building_id: row.building_id, flat_id: row.flat_id, role: row.role,
+      subscription_tier: row.subscription_tier, subscription_expiry: row.subscription_expiry, trial_end: row.trial_end, picture: row.picture,
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Sunucu hatası' });
@@ -223,13 +213,13 @@ router.put('/password', authMiddleware, async (req: AuthRequest, res: Response) 
     }
 
     const db = await getDatabase();
-    const result = db.exec('SELECT password FROM users WHERE id = ?', [req.userId]);
-    if (result.length === 0 || result[0].values.length === 0) {
+    const result = await db.query('SELECT password FROM users WHERE id = $1', [req.userId]);
+    if (result.rows.length === 0) {
       res.status(404).json({ error: 'Kullanıcı bulunamadı' });
       return;
     }
 
-    const hashedPassword = result[0].values[0][0] as string;
+    const hashedPassword = result.rows[0].password;
     const valid = await bcrypt.compare(currentPassword, hashedPassword);
     if (!valid) {
       res.status(400).json({ error: 'Mevcut şifre hatalı' });
@@ -237,7 +227,7 @@ router.put('/password', authMiddleware, async (req: AuthRequest, res: Response) 
     }
 
     const newHashed = await bcrypt.hash(newPassword, 12);
-    db.run('UPDATE users SET password = ? WHERE id = ?', [newHashed, req.userId]);
+    await db.query('UPDATE users SET password = $1 WHERE id = $2', [newHashed, req.userId]);
     saveDatabase();
 
     res.json({ success: true });
@@ -249,23 +239,23 @@ router.put('/password', authMiddleware, async (req: AuthRequest, res: Response) 
 router.post('/invite-code', authMiddleware, subscriptionMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const userResult = db.exec('SELECT building_id FROM users WHERE id = ?', [req.userId]);
-    if (!userResult.length || !userResult[0].values.length) {
+    const userResult = await db.query('SELECT building_id FROM users WHERE id = $1', [req.userId]);
+    if (userResult.rows.length === 0) {
       res.status(404).json({ error: 'Kullanıcı bulunamadı' });
       return;
     }
-    const buildingId = userResult[0].values[0][0] as string;
+    const buildingId = userResult.rows[0].building_id;
     if (!buildingId) {
       res.status(400).json({ error: 'Önce apartman oluşturmalısınız' });
       return;
     }
 
-    const existingResult = db.exec('SELECT invite_code FROM buildings WHERE id = ?', [buildingId]);
-    let code = existingResult[0]?.values[0]?.[0] as string;
+    const existingResult = await db.query('SELECT invite_code FROM buildings WHERE id = $1', [buildingId]);
+    let code = existingResult.rows[0]?.invite_code;
 
     if (!code) {
       code = generateInviteCode();
-      db.run('UPDATE buildings SET invite_code = ? WHERE id = ?', [code, buildingId]);
+      await db.query('UPDATE buildings SET invite_code = $1 WHERE id = $2', [code, buildingId]);
       saveDatabase();
     }
 
@@ -278,15 +268,15 @@ router.post('/invite-code', authMiddleware, subscriptionMiddleware, async (req: 
 router.put('/regenerate-invite', authMiddleware, subscriptionMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const userResult = db.exec('SELECT building_id FROM users WHERE id = ?', [req.userId]);
-    if (!userResult.length || !userResult[0].values.length) {
+    const userResult = await db.query('SELECT building_id FROM users WHERE id = $1', [req.userId]);
+    if (userResult.rows.length === 0) {
       res.status(404).json({ error: 'Kullanıcı bulunamadı' });
       return;
     }
-    const buildingId = userResult[0].values[0][0] as string;
+    const buildingId = userResult.rows[0].building_id;
 
     const code = generateInviteCode();
-    db.run('UPDATE buildings SET invite_code = ? WHERE id = ?', [code, buildingId]);
+    await db.query('UPDATE buildings SET invite_code = $1 WHERE id = $2', [code, buildingId]);
     saveDatabase();
 
     res.json({ inviteCode: code });
@@ -332,34 +322,35 @@ router.post('/google', async (req: Request, res: Response) => {
 
     const db = await getDatabase();
 
-    let userResult = db.exec(
-      'SELECT id, email, full_name, building_id, flat_id, role, subscription_tier, subscription_expiry, trial_end FROM users WHERE google_id = ?',
+    let userResult = await db.query(
+      'SELECT id, email, full_name, building_id, flat_id, role, subscription_tier, subscription_expiry, trial_end FROM users WHERE google_id = $1',
       [googleId]
     );
-    if (userResult.length > 0 && userResult[0].values.length > 0) {
-      const row = userResult[0].values[0];
-      const token = generateToken(row[0] as number);
+    if (userResult.rows.length > 0) {
+      const row = userResult.rows[0];
+      const token = generateToken(row.id);
       res.json({
         token,
-        user: { id: row[0], email: row[1], full_name: row[2], building_id: row[3], flat_id: row[4], role: row[5], subscription_tier: row[6], subscription_expiry: row[7], trial_end: row[8], picture },
+        user: { id: row.id, email: row.email, full_name: row.full_name, building_id: row.building_id, flat_id: row.flat_id, role: row.role, subscription_tier: row.subscription_tier, subscription_expiry: row.subscription_expiry, trial_end: row.trial_end, picture },
       });
       return;
     }
 
-    userResult = db.exec('SELECT id FROM users WHERE email = ?', [email]);
-    if (userResult.length > 0 && userResult[0].values.length > 0) {
-      const userId = userResult[0].values[0][0] as number;
-      db.run('UPDATE users SET google_id = ? WHERE id = ?', [googleId, userId]);
+    userResult = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (userResult.rows.length > 0) {
+      const userId = userResult.rows[0].id;
+      await db.query('UPDATE users SET google_id = $1 WHERE id = $2', [googleId, userId]);
       saveDatabase();
 
-      const row = db.exec(
-        'SELECT id, email, full_name, building_id, flat_id, role, subscription_tier, subscription_expiry, trial_end FROM users WHERE id = ?',
+      const rowResult = await db.query(
+        'SELECT id, email, full_name, building_id, flat_id, role, subscription_tier, subscription_expiry, trial_end FROM users WHERE id = $1',
         [userId]
-      )[0].values[0];
-      const token = generateToken(row[0] as number);
+      );
+      const row = rowResult.rows[0];
+      const token = generateToken(row.id);
       res.json({
         token,
-        user: { id: row[0], email: row[1], full_name: row[2], building_id: row[3], flat_id: row[4], role: row[5], subscription_tier: row[6], subscription_expiry: row[7], trial_end: row[8], picture },
+        user: { id: row.id, email: row.email, full_name: row.full_name, building_id: row.building_id, flat_id: row.flat_id, role: row.role, subscription_tier: row.subscription_tier, subscription_expiry: row.subscription_expiry, trial_end: row.trial_end, picture },
       });
       return;
     }
@@ -372,33 +363,32 @@ router.post('/google', async (req: Request, res: Response) => {
     let flatId: string | null = null;
 
     if (inviteCode) {
-      const buildingResult = db.exec(
-        'SELECT id FROM buildings WHERE invite_code = ?',
+      const buildingResult = await db.query(
+        'SELECT id FROM buildings WHERE invite_code = $1',
         [inviteCode.trim().toUpperCase()]
       );
-      if (buildingResult.length && buildingResult[0].values.length) {
-        buildingId = buildingResult[0].values[0][0] as string;
+      if (buildingResult.rows.length > 0) {
+        buildingId = buildingResult.rows[0].id;
 
         if (flatNumber) {
-          const flatResult = db.exec(
-            'SELECT id FROM flats WHERE building_id = ? AND number = ?',
+          const flatResult = await db.query(
+            'SELECT id FROM flats WHERE building_id = $1 AND number = $2',
             [buildingId, flatNumber]
           );
-          if (flatResult.length && flatResult[0].values.length) {
-            flatId = flatResult[0].values[0][0] as string;
-            db.run('UPDATE flats SET owner_name = ?, owner_email = ? WHERE id = ?', [fullName, email, flatId]);
+          if (flatResult.rows.length > 0) {
+            flatId = flatResult.rows[0].id;
+            await db.query('UPDATE flats SET owner_name = $1, owner_email = $2 WHERE id = $3', [fullName, email, flatId]);
           }
         }
       }
     }
 
     const role = buildingId ? 'resident' : 'admin';
-    db.run(
-      'INSERT INTO users (email, password, full_name, building_id, flat_id, role, google_id, picture, trial_end, subscription_expiry) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    const result = await db.query(
+      'INSERT INTO users (email, password, full_name, building_id, flat_id, role, google_id, picture, trial_end, subscription_expiry) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
       [email, hashedPassword, fullName, buildingId, flatId, role, googleId, picture || null, trialEnd.toISOString(), trialEnd.toISOString()]
     );
-    const idResult = db.exec('SELECT last_insert_rowid()');
-    const userId = idResult[0].values[0][0] as number;
+    const userId = result.rows[0].id;
     saveDatabase();
 
     const token = generateToken(userId);

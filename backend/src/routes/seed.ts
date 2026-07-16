@@ -20,29 +20,29 @@ const sampleResidents = [
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const userResult = db.exec('SELECT building_id FROM users WHERE id = ?', [req.userId]);
-    if (!userResult.length || !userResult[0].values.length) {
+    const userResult = await db.query('SELECT building_id FROM users WHERE id = $1', [req.userId]);
+    if (userResult.rows.length === 0) {
       res.status(400).json({ error: 'User not found' });
       return;
     }
-    const buildingId = userResult[0].values[0][0] as string;
+    const buildingId = userResult.rows[0].building_id;
     if (!buildingId) {
       res.status(400).json({ error: 'No building found' });
       return;
     }
 
-    const flatResult = db.exec('SELECT id, number FROM flats WHERE building_id = ? ORDER BY number LIMIT 10', [buildingId]);
-    if (!flatResult.length) {
+    const flatResult = await db.query('SELECT id, number FROM flats WHERE building_id = $1 ORDER BY number LIMIT 10', [buildingId]);
+    if (flatResult.rows.length === 0) {
       res.status(400).json({ error: 'No flats found' });
       return;
     }
 
-    const flats = flatResult[0].values;
+    const flats = flatResult.rows;
     for (let i = 0; i < flats.length; i++) {
-      const flatId = flats[i][0] as string;
+      const flatId = flats[i].id;
       const resident = sampleResidents[i];
-      db.run(
-        'UPDATE flats SET owner_name = ?, owner_phone = ?, owner_email = ? WHERE id = ?',
+      await db.query(
+        'UPDATE flats SET owner_name = $1, owner_phone = $2, owner_email = $3 WHERE id = $4',
         [resident.name, resident.phone, resident.email, flatId]
       );
     }

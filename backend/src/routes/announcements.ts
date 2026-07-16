@@ -13,23 +13,17 @@ router.get('/building/:buildingId', buildingOwnerMiddleware, async (req: AuthReq
     const limit = Math.min(parseInt(req.query.limit as string) || 6, 50);
     const offset = parseInt(req.query.offset as string) || 0;
 
-    const countResult = db.exec(
-      'SELECT COUNT(*) as total FROM announcements WHERE building_id = ?',
+    const countResult = await db.query(
+      'SELECT COUNT(*) as total FROM announcements WHERE building_id = $1',
       [req.params.buildingId]
     );
-    const total = countResult.length > 0 ? (countResult[0].values[0][0] as number) : 0;
+    const total = countResult.rows.length > 0 ? countResult.rows[0].total : 0;
 
-    const result = db.exec(
-      `SELECT * FROM announcements WHERE building_id = ? ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`,
-      [req.params.buildingId]
+    const result = await db.query(
+      'SELECT * FROM announcements WHERE building_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+      [req.params.buildingId, limit, offset]
     );
-    const announcements = result.length > 0
-      ? result[0].values.map((row) => ({
-          id: row[0], building_id: row[1], title: row[2],
-          content: row[3], created_by: row[4], created_at: row[5],
-        }))
-      : [];
-    res.json({ announcements, total, limit, offset });
+    res.json({ announcements: result.rows, total, limit, offset });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -44,15 +38,15 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     }
 
     const db = await getDatabase();
-    const ownResult = db.exec('SELECT admin_id FROM buildings WHERE id = ?', [buildingId]);
-    if (!ownResult.length || !ownResult[0].values.length || ownResult[0].values[0][0] !== req.userId) {
+    const ownResult = await db.query('SELECT admin_id FROM buildings WHERE id = $1', [buildingId]);
+    if (ownResult.rows.length === 0 || ownResult.rows[0].admin_id !== req.userId) {
       res.status(403).json({ error: 'Unauthorized' });
       return;
     }
 
     const id = generateId();
-    db.run(
-      'INSERT INTO announcements (id, building_id, title, content, created_by) VALUES (?, ?, ?, ?, ?)',
+    await db.query(
+      'INSERT INTO announcements (id, building_id, title, content, created_by) VALUES ($1, $2, $3, $4, $5)',
       [id, buildingId, title, content, req.userId]
     );
     saveDatabase();
@@ -69,19 +63,19 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const result = db.exec('SELECT building_id FROM announcements WHERE id = ?', [req.params.id]);
-    if (!result.length || !result[0].values.length) {
+    const result = await db.query('SELECT building_id FROM announcements WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
       res.status(404).json({ error: 'Announcement not found' });
       return;
     }
-    const buildingId = result[0].values[0][0] as string;
-    const ownResult = db.exec('SELECT admin_id FROM buildings WHERE id = ?', [buildingId]);
-    if (!ownResult.length || !ownResult[0].values.length || ownResult[0].values[0][0] !== req.userId) {
+    const buildingId = result.rows[0].building_id;
+    const ownResult = await db.query('SELECT admin_id FROM buildings WHERE id = $1', [buildingId]);
+    if (ownResult.rows.length === 0 || ownResult.rows[0].admin_id !== req.userId) {
       res.status(403).json({ error: 'Unauthorized' });
       return;
     }
 
-    db.run('DELETE FROM announcements WHERE id = ?', [req.params.id]);
+    await db.query('DELETE FROM announcements WHERE id = $1', [req.params.id]);
     saveDatabase();
     res.json({ success: true });
   } catch (error: any) {

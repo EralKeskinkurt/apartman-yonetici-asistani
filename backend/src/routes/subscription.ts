@@ -12,27 +12,27 @@ const TRIAL_DAYS = 10;
 router.get('/status', async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const result = db.exec(
-      'SELECT subscription_tier, subscription_expiry, trial_end, card_added FROM users WHERE id = ?',
+    const result = await db.query(
+      'SELECT subscription_tier, subscription_expiry, trial_end, card_added FROM users WHERE id = $1',
       [req.userId]
     );
-    if (!result.length || !result[0].values.length) {
+    if (result.rows.length === 0) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    const row = result[0].values[0];
-    const expiry = row[1] ? new Date(row[1] as string) : null;
-    const trialEnd = row[2] ? new Date(row[2] as string) : null;
+    const row = result.rows[0];
+    const expiry = row.subscription_expiry ? new Date(row.subscription_expiry as string) : null;
+    const trialEnd = row.trial_end ? new Date(row.trial_end as string) : null;
     const now = new Date();
 
     res.json({
-      tier: row[0],
-      expiry: row[1],
-      trial_end: row[2],
-      card_added: row[3],
+      tier: row.subscription_tier,
+      expiry: row.subscription_expiry,
+      trial_end: row.trial_end,
+      card_added: row.card_added,
       daysLeft: expiry ? Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / 86400000)) : 0,
       isExpired: expiry ? expiry < now : false,
-      isTrial: row[0] === 'trial',
+      isTrial: row.subscription_tier === 'trial',
       monthlyPrice: MONTHLY_PRICE,
       trialDays: TRIAL_DAYS,
     });
@@ -53,7 +53,7 @@ router.post('/add-card', async (req: AuthRequest, res: Response) => {
     const masked = `**** **** **** ${last4}`;
 
     const db = await getDatabase();
-    db.run('UPDATE users SET card_added = 1, card_last4 = ?, card_holder = ?, card_expiry = ? WHERE id = ?',
+    await db.query('UPDATE users SET card_added = true, card_last4 = $1, card_holder = $2, card_expiry = $3 WHERE id = $4',
       [last4, cardHolder, expiryDate, req.userId]);
     saveDatabase();
 
@@ -66,10 +66,10 @@ router.post('/add-card', async (req: AuthRequest, res: Response) => {
 router.post('/activate', async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const userResult = db.exec('SELECT subscription_tier, card_added FROM users WHERE id = ?', [req.userId]);
-    const row = userResult[0].values[0];
+    const userResult = await db.query('SELECT subscription_tier, card_added FROM users WHERE id = $1', [req.userId]);
+    const row = userResult.rows[0];
 
-    if (!row[1]) {
+    if (!row.card_added) {
       res.status(400).json({ error: 'Önce kart eklemelisiniz' });
       return;
     }
@@ -77,8 +77,8 @@ router.post('/activate', async (req: AuthRequest, res: Response) => {
     const expiry = new Date();
     expiry.setDate(expiry.getDate() + 30);
 
-    db.run(
-      'UPDATE users SET subscription_tier = ?, subscription_expiry = ? WHERE id = ?',
+    await db.query(
+      'UPDATE users SET subscription_tier = $1, subscription_expiry = $2 WHERE id = $3',
       ['active', expiry.toISOString(), req.userId]
     );
     saveDatabase();
@@ -92,14 +92,14 @@ router.post('/activate', async (req: AuthRequest, res: Response) => {
 router.post('/renew', async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const userResult = db.exec(
-      'SELECT subscription_tier, subscription_expiry, card_added FROM users WHERE id = ?',
+    const userResult = await db.query(
+      'SELECT subscription_tier, subscription_expiry, card_added FROM users WHERE id = $1',
       [req.userId]
     );
-    const row = userResult[0].values[0];
-    const tier = row[0] as string;
-    const expiry = row[1] ? new Date(row[1] as string) : null;
-    const cardAdded = row[2];
+    const row = userResult.rows[0];
+    const tier = row.subscription_tier;
+    const expiry = row.subscription_expiry ? new Date(row.subscription_expiry) : null;
+    const cardAdded = row.card_added;
 
     if (tier !== 'active') {
       res.status(400).json({ error: 'Aktif abonelik yok' });
@@ -114,8 +114,8 @@ router.post('/renew', async (req: AuthRequest, res: Response) => {
     const newExpiry = expiry ? new Date(expiry) : new Date();
     newExpiry.setDate(newExpiry.getDate() + 30);
 
-    db.run(
-      'UPDATE users SET subscription_expiry = ? WHERE id = ?',
+    await db.query(
+      'UPDATE users SET subscription_expiry = $1 WHERE id = $2',
       [newExpiry.toISOString(), req.userId]
     );
     saveDatabase();

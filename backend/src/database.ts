@@ -1,161 +1,121 @@
-// @ts-nocheck
-import initSqlJs from 'sql.js';
-import fs from 'node:fs';
-import path from 'node:path';
+import { Pool } from 'pg';
 
-const DATA_DIR = process.env.DB_DIR || path.join(__dirname, '..', 'data');
-const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'apartment.db');
-let db: any = null;
+let pool: Pool | null = null;
 
-export async function getDatabase() {
-  if (db) return db;
+export async function getDatabase(): Promise<Pool> {
+  if (pool) return pool;
 
-  const SQL = await initSqlJs();
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+  });
 
-  try {
-    const dir = path.dirname(DB_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  await pool.query('SELECT 1');
+  await initTables(pool);
 
-    if (fs.existsSync(DB_PATH)) {
-      const buffer = fs.readFileSync(DB_PATH);
-      db = new SQL.Database(buffer);
-    } else {
-      db = new SQL.Database();
-    }
-  } catch {
-    db = new SQL.Database();
-  }
-  db.run('PRAGMA foreign_keys = ON');
-  initTables(db);
-  return db;
+  return pool;
 }
 
-function initTables(database: any) {
-  try { database.run('ALTER TABLE users ADD COLUMN subscription_tier TEXT DEFAULT "trial"'); } catch {}
-  try { database.run('ALTER TABLE users ADD COLUMN subscription_expiry TEXT'); } catch {}
-  try { database.run('ALTER TABLE users ADD COLUMN trial_end TEXT'); } catch {}
-  try { database.run('ALTER TABLE users ADD COLUMN card_added INTEGER DEFAULT 0'); } catch {}
-  try { database.run('ALTER TABLE users ADD COLUMN card_last4 TEXT'); } catch {}
-  try { database.run('ALTER TABLE users ADD COLUMN card_holder TEXT'); } catch {}
-  try { database.run('ALTER TABLE users ADD COLUMN card_expiry TEXT'); } catch {}
-  try { database.run('ALTER TABLE users ADD COLUMN flat_id TEXT'); } catch {}
-  try { database.run('ALTER TABLE users ADD COLUMN google_id TEXT'); } catch {}
-  try { database.run('ALTER TABLE users ADD COLUMN picture TEXT'); } catch {}
-  try { database.run('ALTER TABLE buildings ADD COLUMN invite_code TEXT'); } catch {}
-
-  database.run(`
+async function initTables(db: Pool) {
+  await db.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      full_name TEXT NOT NULL,
+      id SERIAL PRIMARY KEY,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      full_name VARCHAR(255) NOT NULL,
       building_id TEXT,
       flat_id TEXT,
-      role TEXT DEFAULT 'admin',
-      subscription_tier TEXT DEFAULT 'trial',
-      subscription_expiry TEXT,
-      trial_end TEXT,
-      card_added INTEGER DEFAULT 0,
-      card_last4 TEXT,
-      card_holder TEXT,
-      card_expiry TEXT,
-      google_id TEXT,
+      role VARCHAR(20) DEFAULT 'admin',
+      subscription_tier VARCHAR(20) DEFAULT 'trial',
+      subscription_expiry TIMESTAMP,
+      trial_end TIMESTAMP,
+      card_added BOOLEAN DEFAULT FALSE,
+      card_last4 VARCHAR(4),
+      card_holder VARCHAR(255),
+      card_expiry VARCHAR(10),
+      google_id VARCHAR(255),
       picture TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS buildings (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
+      name VARCHAR(255) NOT NULL,
       address TEXT,
       total_flats INTEGER DEFAULT 0,
-      monthly_dues REAL DEFAULT 0,
+      monthly_dues DECIMAL(10,2) DEFAULT 0,
       admin_id INTEGER,
-      invite_code TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
+      invite_code VARCHAR(10),
+      created_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS flats (
       id TEXT PRIMARY KEY,
-      building_id TEXT NOT NULL,
+      building_id TEXT NOT NULL REFERENCES buildings(id),
       floor INTEGER DEFAULT 0,
       number INTEGER NOT NULL,
-      owner_name TEXT,
-      owner_phone TEXT,
-      owner_email TEXT,
-      is_rented INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (building_id) REFERENCES buildings(id)
+      owner_name VARCHAR(255),
+      owner_phone VARCHAR(20),
+      owner_email VARCHAR(255),
+      is_rented BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS dues (
       id TEXT PRIMARY KEY,
-      flat_id TEXT NOT NULL,
-      building_id TEXT NOT NULL,
-      amount REAL NOT NULL,
+      flat_id TEXT NOT NULL REFERENCES flats(id),
+      building_id TEXT NOT NULL REFERENCES buildings(id),
+      amount DECIMAL(10,2) NOT NULL,
       month INTEGER NOT NULL,
       year INTEGER NOT NULL,
-      is_paid INTEGER DEFAULT 0,
-      paid_at TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (flat_id) REFERENCES flats(id),
-      FOREIGN KEY (building_id) REFERENCES buildings(id)
+      is_paid BOOLEAN DEFAULT FALSE,
+      paid_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS expenses (
       id TEXT PRIMARY KEY,
-      building_id TEXT NOT NULL,
-      category TEXT NOT NULL,
+      building_id TEXT NOT NULL REFERENCES buildings(id),
+      category VARCHAR(50) NOT NULL,
       description TEXT NOT NULL,
-      amount REAL NOT NULL,
+      amount DECIMAL(10,2) NOT NULL,
       date TEXT NOT NULL,
       receipt_url TEXT,
       created_by INTEGER,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (building_id) REFERENCES buildings(id)
+      created_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS announcements (
       id TEXT PRIMARY KEY,
-      building_id TEXT NOT NULL,
-      title TEXT NOT NULL,
+      building_id TEXT NOT NULL REFERENCES buildings(id),
+      title VARCHAR(255) NOT NULL,
       content TEXT NOT NULL,
       created_by INTEGER,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (building_id) REFERENCES buildings(id)
+      created_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS polls (
       id TEXT PRIMARY KEY,
-      building_id TEXT NOT NULL,
-      title TEXT NOT NULL,
+      building_id TEXT NOT NULL REFERENCES buildings(id),
+      title VARCHAR(255) NOT NULL,
       description TEXT,
       options TEXT NOT NULL,
       created_by INTEGER,
-      expires_at TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (building_id) REFERENCES buildings(id)
+      expires_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS votes (
       id TEXT PRIMARY KEY,
-      poll_id TEXT NOT NULL,
+      poll_id TEXT NOT NULL REFERENCES polls(id),
       user_id INTEGER NOT NULL,
       option_index INTEGER NOT NULL,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (poll_id) REFERENCES polls(id),
+      created_at TIMESTAMP DEFAULT NOW(),
       UNIQUE(poll_id, user_id)
     );
   `);
-  saveDatabase();
 }
 
 export function saveDatabase() {
-  if (!db) return;
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const data = db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
 }
 
 export function generateId(): string {
@@ -169,4 +129,10 @@ export function generateInviteCode(): string {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
+}
+
+export async function query(sql: string, params?: any[]): Promise<any[]> {
+  const db = await getDatabase();
+  const result = await db.query(sql, params);
+  return result.rows;
 }

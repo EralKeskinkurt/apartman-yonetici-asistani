@@ -41,16 +41,16 @@ export async function buildingOwnerMiddleware(req: AuthRequest, res: Response, n
       return;
     }
     const db = await getDatabase();
-    const userResult = db.exec(
-      'SELECT building_id, role FROM users WHERE id = ?',
+    const userResult = await db.query(
+      'SELECT building_id, role FROM users WHERE id = $1',
       [req.userId]
     );
-    if (!userResult.length || !userResult[0].values.length) {
+    if (userResult.rows.length === 0) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    const userBuildingId = userResult[0].values[0][0] as string;
-    const userRole = userResult[0].values[0][1] as string;
+    const userBuildingId = userResult.rows[0].building_id;
+    const userRole = userResult.rows[0].role;
 
     if (userRole === 'resident' && userBuildingId === buildingId) {
       next();

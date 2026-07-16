@@ -10,18 +10,11 @@ router.use(subscriptionMiddleware);
 router.get('/building/:buildingId', buildingOwnerMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const result = db.exec(
-      'SELECT * FROM expenses WHERE building_id = ? ORDER BY date DESC',
+    const result = await db.query(
+      'SELECT * FROM expenses WHERE building_id = $1 ORDER BY date DESC',
       [req.params.buildingId]
     );
-    const expenses = result.length > 0
-      ? result[0].values.map((row) => ({
-          id: row[0], building_id: row[1], category: row[2],
-          description: row[3], amount: row[4], date: row[5],
-          receipt_url: row[6], created_by: row[7], created_at: row[8],
-        }))
-      : [];
-    res.json(expenses);
+    res.json(result.rows);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -33,18 +26,18 @@ router.get('/total/:buildingId', buildingOwnerMiddleware, async (req: AuthReques
     const db = await getDatabase();
     let result;
     if (month && year) {
-      result = db.exec(
+      result = await db.query(
         `SELECT COALESCE(SUM(amount), 0) as total FROM expenses
-         WHERE building_id = ? AND strftime('%m', date) = ? AND strftime('%Y', date) = ?`,
-        [req.params.buildingId, String(Number(month) + 1).padStart(2, '0'), String(year)]
+         WHERE building_id = $1 AND EXTRACT(MONTH FROM date::timestamp) = $2 AND EXTRACT(YEAR FROM date::timestamp) = $3`,
+        [req.params.buildingId, Number(month) + 1, String(year)]
       );
     } else {
-      result = db.exec(
-        'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE building_id = ?',
+      result = await db.query(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE building_id = $1',
         [req.params.buildingId]
       );
     }
-    res.json({ total: result[0].values[0][0] });
+    res.json({ total: result.rows[0].total });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -59,15 +52,15 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     }
 
     const db = await getDatabase();
-    const ownResult = db.exec('SELECT admin_id FROM buildings WHERE id = ?', [buildingId]);
-    if (!ownResult.length || !ownResult[0].values.length || ownResult[0].values[0][0] !== req.userId) {
+    const ownResult = await db.query('SELECT admin_id FROM buildings WHERE id = $1', [buildingId]);
+    if (ownResult.rows.length === 0 || ownResult.rows[0].admin_id !== req.userId) {
       res.status(403).json({ error: 'Unauthorized' });
       return;
     }
 
     const id = generateId();
-    db.run(
-      'INSERT INTO expenses (id, building_id, category, description, amount, date, created_by) VALUES (?, ?, ?, ?, ?, datetime("now"), ?)',
+    await db.query(
+      'INSERT INTO expenses (id, building_id, category, description, amount, date, created_by) VALUES ($1, $2, $3, $4, $5, NOW()::text, $6)',
       [id, buildingId, category, description, amount, req.userId]
     );
     saveDatabase();
@@ -85,20 +78,20 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { category, description, amount } = req.body;
     const db = await getDatabase();
-    const result = db.exec('SELECT building_id FROM expenses WHERE id = ?', [req.params.id]);
-    if (!result.length || !result[0].values.length) {
+    const result = await db.query('SELECT building_id FROM expenses WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
       res.status(404).json({ error: 'Expense not found' });
       return;
     }
-    const buildingId = result[0].values[0][0] as string;
-    const ownResult = db.exec('SELECT admin_id FROM buildings WHERE id = ?', [buildingId]);
-    if (!ownResult.length || !ownResult[0].values.length || ownResult[0].values[0][0] !== req.userId) {
+    const buildingId = result.rows[0].building_id;
+    const ownResult = await db.query('SELECT admin_id FROM buildings WHERE id = $1', [buildingId]);
+    if (ownResult.rows.length === 0 || ownResult.rows[0].admin_id !== req.userId) {
       res.status(403).json({ error: 'Unauthorized' });
       return;
     }
 
-    db.run(
-      'UPDATE expenses SET category = ?, description = ?, amount = ? WHERE id = ?',
+    await db.query(
+      'UPDATE expenses SET category = $1, description = $2, amount = $3 WHERE id = $4',
       [category, description, amount, req.params.id]
     );
     saveDatabase();
@@ -111,19 +104,19 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const result = db.exec('SELECT building_id FROM expenses WHERE id = ?', [req.params.id]);
-    if (!result.length || !result[0].values.length) {
+    const result = await db.query('SELECT building_id FROM expenses WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
       res.status(404).json({ error: 'Expense not found' });
       return;
     }
-    const buildingId = result[0].values[0][0] as string;
-    const ownResult = db.exec('SELECT admin_id FROM buildings WHERE id = ?', [buildingId]);
-    if (!ownResult.length || !ownResult[0].values.length || ownResult[0].values[0][0] !== req.userId) {
+    const buildingId = result.rows[0].building_id;
+    const ownResult = await db.query('SELECT admin_id FROM buildings WHERE id = $1', [buildingId]);
+    if (ownResult.rows.length === 0 || ownResult.rows[0].admin_id !== req.userId) {
       res.status(403).json({ error: 'Unauthorized' });
       return;
     }
 
-    db.run('DELETE FROM expenses WHERE id = ?', [req.params.id]);
+    await db.query('DELETE FROM expenses WHERE id = $1', [req.params.id]);
     saveDatabase();
     res.json({ success: true });
   } catch (error: any) {

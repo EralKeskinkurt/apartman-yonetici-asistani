@@ -7,8 +7,6 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8081';
 const pending3DS = new Map<string, { userId: number; last4: string }>();
 const router = Router();
 
-// ---- Auth gerektirmeyen route'lar ----
-
 router.post('/callback', async (req, res) => {
   try {
     const token = req.body.token;
@@ -27,8 +25,8 @@ router.post('/callback', async (req, res) => {
         const db = await getDatabase();
         const expiry = new Date();
         expiry.setDate(expiry.getDate() + 30);
-        db.run(
-          'UPDATE users SET subscription_tier = ?, subscription_expiry = ?, card_added = 1, card_last4 = ? WHERE id = ?',
+        await db.query(
+          'UPDATE users SET subscription_tier = $1, subscription_expiry = $2, card_added = true, card_last4 = $3 WHERE id = $4',
           ['active', expiry.toISOString(), result.lastFourDigits || '****', Number(userId)]
         );
         saveDatabase();
@@ -60,8 +58,8 @@ router.post('/verify', async (req, res) => {
         const db = await getDatabase();
         const expiry = new Date();
         expiry.setDate(expiry.getDate() + 30);
-        db.run(
-          'UPDATE users SET subscription_tier = ?, subscription_expiry = ?, card_added = 1, card_last4 = ? WHERE id = ?',
+        await db.query(
+          'UPDATE users SET subscription_tier = $1, subscription_expiry = $2, card_added = true, card_last4 = $3 WHERE id = $4',
           ['active', expiry.toISOString(), result.lastFourDigits || '****', Number(userId)]
         );
         saveDatabase();
@@ -99,8 +97,8 @@ router.post('/threeds-callback', async (req, res) => {
         const db = await getDatabase();
         const expiry = new Date();
         expiry.setDate(expiry.getDate() + 30);
-        db.run(
-          'UPDATE users SET subscription_tier = ?, subscription_expiry = ?, card_added = 1, card_last4 = ? WHERE id = ?',
+        await db.query(
+          'UPDATE users SET subscription_tier = $1, subscription_expiry = $2, card_added = true, card_last4 = $3 WHERE id = $4',
           ['active', expiry.toISOString(), pending.last4, pending.userId]
         );
         saveDatabase();
@@ -114,14 +112,12 @@ router.post('/threeds-callback', async (req, res) => {
   }
 });
 
-// ---- Auth gerektiren route'lar ----
-
 router.use(authMiddleware);
 
 router.post('/create-checkout', async (req: AuthRequest, res: Response) => {
   try {
     const userResult = await dbExec(
-      'SELECT id, email, full_name FROM users WHERE id = ?',
+      'SELECT id, email, full_name FROM users WHERE id = $1',
       [req.userId]
     );
     if (!userResult.length) {
@@ -201,7 +197,7 @@ router.post('/pay-with-card', async (req: AuthRequest, res: Response) => {
     }
 
     const userResult = await dbExec(
-      'SELECT id, email, full_name FROM users WHERE id = ?',
+      'SELECT id, email, full_name FROM users WHERE id = $1',
       [req.userId]
     );
     if (!userResult.length) {
@@ -276,8 +272,8 @@ router.post('/pay-with-card', async (req: AuthRequest, res: Response) => {
         const db = await getDatabase();
         const expiry = new Date();
         expiry.setDate(expiry.getDate() + 30);
-        db.run(
-          'UPDATE users SET subscription_tier = ?, subscription_expiry = ?, card_added = 1, card_last4 = ? WHERE id = ?',
+        await db.query(
+          'UPDATE users SET subscription_tier = $1, subscription_expiry = $2, card_added = true, card_last4 = $3 WHERE id = $4',
           ['active', expiry.toISOString(), last4, req.userId]
         );
         saveDatabase();
@@ -304,22 +300,22 @@ router.post('/pay-with-card', async (req: AuthRequest, res: Response) => {
 router.get('/status', async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    const result = db.exec(
-      'SELECT subscription_tier, subscription_expiry, trial_end, card_last4 FROM users WHERE id = ?',
+    const result = await db.query(
+      'SELECT subscription_tier, subscription_expiry, trial_end, card_last4 FROM users WHERE id = $1',
       [req.userId]
     );
-    if (!result.length || !result[0].values.length) {
+    if (result.rows.length === 0) {
       res.status(404).json({ error: 'Kullanıcı bulunamadı' });
       return;
     }
-    const row = result[0]?.values?.[0] || [];
-    const expiry = row[1] ? new Date(row[1] as string) : null;
+    const row = result.rows[0];
+    const expiry = row.subscription_expiry ? new Date(row.subscription_expiry as string) : null;
     const now = new Date();
 
     res.json({
-      tier: row[0] || 'trial',
-      expiry: row[1],
-      cardLast4: row[3],
+      tier: row.subscription_tier || 'trial',
+      expiry: row.subscription_expiry,
+      cardLast4: row.card_last4,
       daysLeft: expiry ? Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / 86400000)) : 0,
       isExpired: expiry ? expiry < now : false,
       monthlyPrice: MONTHLY_PRICE,
@@ -332,7 +328,7 @@ router.get('/status', async (req: AuthRequest, res: Response) => {
 router.post('/cancel', async (req: AuthRequest, res: Response) => {
   try {
     const db = await getDatabase();
-    db.run('UPDATE users SET subscription_tier = ?, subscription_expiry = ?, card_added = 0, card_last4 = NULL WHERE id = ?', ['trial', null, req.userId]);
+    await db.query('UPDATE users SET subscription_tier = $1, subscription_expiry = $2, card_added = false, card_last4 = NULL WHERE id = $3', ['trial', null, req.userId]);
     saveDatabase();
     res.json({ success: true });
   } catch (error: any) {
@@ -342,8 +338,8 @@ router.post('/cancel', async (req: AuthRequest, res: Response) => {
 
 async function dbExec(sql: string, params: any[]): Promise<any[][]> {
   const db = await getDatabase();
-  const result = db.exec(sql, params);
-  return result.length > 0 ? result[0].values : [];
+  const result = await db.query(sql, params);
+  return result.rows.length > 0 ? [result.rows.map((row: any) => Object.values(row))] : [];
 }
 
 export default router;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useResponsive } from '../components/useResponsive';
@@ -13,6 +14,7 @@ export default function PollsScreen() {
   const { theme } = useTheme();
   const { contentMaxWidth } = useResponsive();
   const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
   const c = theme.colors;
 
   const polls = useStore((s) => s.polls);
@@ -80,7 +82,7 @@ export default function PollsScreen() {
               ))}
               <TouchableOpacity style={s.addOpt} onPress={addOption}><Ionicons name="add-circle-outline" size={20} color={c.primaryLight} /><Text style={[s.addOptText, { color: c.primaryLight }]}>Seçenek Ekle</Text></TouchableOpacity>
             </ScrollView>
-            <View style={[s.modalFooter, { backgroundColor: c.surface, borderTopColor: c.border }]}>
+            <View style={[s.modalFooter, { backgroundColor: c.surface, borderTopColor: c.border, paddingBottom: Math.max(16, insets.bottom + 8) }]}>
               <TouchableOpacity style={[s.cancelBtn, { backgroundColor: c.border }]} onPress={() => { setShowForm(false); setTitle(''); setDesc(''); setOptions(['', '']); }}>
                 <Text style={[s.cancelBtnText, { color: c.text }]}>İptal</Text>
               </TouchableOpacity>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { EXPENSE_CATEGORIES } from '../constants/config';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useResponsive } from '../components/useResponsive';
@@ -14,6 +15,7 @@ export default function ExpensesScreen() {
   const { theme } = useTheme();
   const { isDesktop, contentMaxWidth } = useResponsive();
   const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
   const c = theme.colors;
 
   const expenses = useStore((s) => s.expenses);
@@ -40,23 +42,17 @@ export default function ExpensesScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleAdd = async () => {
+  const handleSave = async () => {
     if (!description || !amount || !category) { showToast('Tüm alanları doldurun', 'error'); return; }
     setLoading(true);
     try {
-      await addExpense(user!.building_id!, category, description, Number(amount));
-      showToast('Gider kaydedildi', 'success');
-      resetForm();
-    } catch (e: any) { showToast(e.message, 'error'); }
-    finally { setLoading(false); }
-  };
-
-  const handleEdit = async () => {
-    if (!editingId || !description || !amount || !category) { showToast('Tüm alanları doldurun', 'error'); return; }
-    setLoading(true);
-    try {
-      await updateExpense(editingId, category, description, Number(amount));
-      showToast('Gider güncellendi', 'success');
+      if (editingId) {
+        await updateExpense(editingId, category, description, Number(amount));
+        showToast('Gider güncellendi', 'success');
+      } else {
+        await addExpense(user!.building_id!, category, description, Number(amount));
+        showToast('Gider kaydedildi', 'success');
+      }
       resetForm();
     } catch (e: any) { showToast(e.message, 'error'); }
     finally { setLoading(false); }
@@ -74,31 +70,45 @@ export default function ExpensesScreen() {
     <ScrollView style={[s.wrapper, { backgroundColor: c.background }]} contentContainerStyle={{ maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%', paddingBottom: 80 }}>
       <View style={s.header}>
         <Text style={[s.title, { color: c.text }]}>Gider Yönetimi</Text>
-        <TouchableOpacity style={[s.addBtn, { backgroundColor: c.accent }]} onPress={() => { resetForm(); setShowForm(!showForm); }}>
-          <Ionicons name={showForm ? 'close' : 'add'} size={22} color={c.accentText} />
-          <Text style={[s.addBtnText, { color: c.accentText }]}>{showForm ? 'İptal' : 'Gider Ekle'}</Text>
+        <TouchableOpacity style={[s.addBtn, { backgroundColor: c.accent }]} onPress={() => { resetForm(); setShowForm(true); }}>
+          <Ionicons name="add" size={22} color={c.accentText} />
+          <Text style={[s.addBtnText, { color: c.accentText }]}>Gider Ekle</Text>
         </TouchableOpacity>
       </View>
 
-      {showForm && (
-        <View style={[s.form, { backgroundColor: c.surface }]}>
-          <Text style={[s.formTitle, { color: c.text }]}>{editingId ? 'Gideri Düzenle' : 'Yeni Gider'}</Text>
-          <TextInput style={[s.input, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Açıklama" placeholderTextColor={c.textMuted} value={description} onChangeText={setDescription} />
-          <TextInput style={[s.input, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Tutar (₺)" placeholderTextColor={c.textMuted} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
-          <Text style={[s.label, { color: c.textSecondary }]}>Kategori</Text>
-          <View style={s.catList}>
-            {EXPENSE_CATEGORIES.map((cat) => (
-              <TouchableOpacity key={cat} style={[s.catItem, { backgroundColor: c.surfaceSecondary }, category === cat && { backgroundColor: c.accent }]} onPress={() => setCategory(cat)}>
-                <Text style={[s.catText, { color: c.textSecondary }, category === cat && { color: c.accentText }]}>{cat}</Text>
+      <Modal visible={showForm} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <View style={[s.modalWrapper, { backgroundColor: c.background }]}>
+            <View style={[s.modalHeader, { borderBottomColor: c.border }]}>
+              <Text style={[s.modalTitle, { color: c.text }]}>{editingId ? 'Gideri Düzenle' : 'Yeni Gider'}</Text>
+              <TouchableOpacity onPress={resetForm}>
+                <Ionicons name="close" size={26} color={c.textSecondary} />
               </TouchableOpacity>
-            ))}
+            </View>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
+              <TextInput style={[s.input, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Açıklama" placeholderTextColor={c.textMuted} value={description} onChangeText={setDescription} />
+              <TextInput style={[s.input, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Tutar (₺)" placeholderTextColor={c.textMuted} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
+              <Text style={[s.label, { color: c.textSecondary }]}>Kategori</Text>
+              <View style={s.catList}>
+                {EXPENSE_CATEGORIES.map((cat) => (
+                  <TouchableOpacity key={cat} style={[s.catItem, { backgroundColor: c.surfaceSecondary }, category === cat && { backgroundColor: c.accent }]} onPress={() => setCategory(cat)}>
+                    <Text style={[s.catText, { color: c.textSecondary }, category === cat && { color: c.accentText }]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+            <View style={[s.modalFooter, { backgroundColor: c.surface, borderTopColor: c.border, paddingBottom: Math.max(16, insets.bottom + 8) }]}>
+              <TouchableOpacity style={[s.cancelBtn, { backgroundColor: c.border }]} onPress={resetForm}>
+                <Text style={[s.cancelBtnText, { color: c.text }]}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.saveBtn, { backgroundColor: c.accent, flex: 1 }, loading && { opacity: 0.6 }]} onPress={handleSave} disabled={loading}>
+                <Ionicons name="save" size={20} color={c.accentText} />
+                <Text style={[s.saveBtnText, { color: c.accentText }]}>{loading ? (editingId ? 'Güncelleniyor...' : 'Kaydediliyor...') : (editingId ? 'Güncelle' : 'Kaydet')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <TouchableOpacity style={[s.saveBtn, { backgroundColor: c.accent }, loading && { opacity: 0.6 }]} onPress={editingId ? handleEdit : handleAdd} disabled={loading}>
-            <Ionicons name="save" size={20} color={c.accentText} />
-            <Text style={[s.saveBtnText, { color: c.accentText }]}>{editingId ? 'Güncelle' : 'Kaydet'}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        </KeyboardAvoidingView>
+      </Modal>
 
       <View style={[s.totalRow, { backgroundColor: c.surface }]}>
         <Text style={[s.totalLabel, { color: c.textSecondary }]}>Toplam Gider</Text>
@@ -146,15 +156,19 @@ const s = StyleSheet.create({
   wrapper: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, paddingTop: 40 },
   title: { fontSize: 22, fontWeight: 'bold' },
-  addBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, gap: 6 },
-  addBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  form: { marginHorizontal: 24, padding: 16, borderRadius: 10, marginBottom: 8 },
-  formTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, gap: 6 },
+  addBtnText: { fontWeight: '600', fontSize: 14 },
+  modalWrapper: { flex: 1 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 56, paddingBottom: 16, borderBottomWidth: 1 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold' },
+  modalFooter: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1 },
   input: { padding: 14, borderRadius: 8, marginBottom: 12, fontSize: 15, borderWidth: 1 },
   label: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
   catList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   catItem: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   catText: { fontSize: 13 },
+  cancelBtn: { padding: 14, borderRadius: 8, alignItems: 'center', minWidth: 80 },
+  cancelBtnText: { fontWeight: '600', fontSize: 15 },
   saveBtn: { padding: 14, borderRadius: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
   saveBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16, marginHorizontal: 24, borderRadius: 8, marginTop: 8 },
