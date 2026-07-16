@@ -35,10 +35,10 @@ function AdminTabs({ initialTab }: { initialTab?: string }) {
         const name = focused ? icons[route.name] : `${icons[route.name]}-outline`;
         return <Ionicons name={name as any} size={size} color={color} />;
       },
-      tabBarActiveTintColor: theme.colors.text,
+      tabBarActiveTintColor: theme.colors.primary,
       tabBarInactiveTintColor: theme.colors.textMuted,
       tabBarStyle: { backgroundColor: theme.colors.tabBar, borderTopColor: theme.colors.tabBarBorder, borderTopWidth: 0, elevation: 0 },
-      tabBarItemStyle: { marginTop: -4 },
+      tabBarLabelStyle: { fontSize: 11, marginBottom: 4 },
     })}>
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Anasayfa' }} />
       <Tab.Screen name="Dues" component={DuesScreen} options={{ title: 'Aidatlar' }} />
@@ -60,10 +60,10 @@ function ResidentTabs() {
         const name = focused ? icons[route.name] : `${icons[route.name]}-outline`;
         return <Ionicons name={name as any} size={size} color={color} />;
       },
-      tabBarActiveTintColor: theme.colors.text,
+      tabBarActiveTintColor: theme.colors.primary,
       tabBarInactiveTintColor: theme.colors.textMuted,
       tabBarStyle: { backgroundColor: theme.colors.tabBar, borderTopColor: theme.colors.tabBarBorder, borderTopWidth: 0, elevation: 0 },
-      tabBarItemStyle: { marginTop: -4 },
+      tabBarLabelStyle: { fontSize: 11, marginBottom: 4 },
     })}>
       <Tab.Screen name="ResidentDashboard" component={ResidentDashboardScreen} options={{ title: 'Anasayfa' }} />
       <Tab.Screen name="MyDuesTab" component={ResidentMyDuesScreen} options={{ title: 'Aidatlarım' }} />
