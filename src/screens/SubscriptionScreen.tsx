@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, Platform, Modal, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
@@ -167,69 +167,42 @@ export default function SubscriptionScreen() {
               <Text style={[s.btnText, { color: c.danger }]}>Aboneliği İptal Et</Text>
             </TouchableOpacity>
           </>
-        ) : !showCardForm ? (
-          <TouchableOpacity style={[s.btn, { backgroundColor: c.accent }]} onPress={() => setShowCardForm(true)}>
-            <Ionicons name="card-outline" size={20} color={c.accentText} />
-            <Text style={[s.btnText, { color: c.accentText }]}>Abone Ol - ₺99/ay</Text>
-          </TouchableOpacity>
-        ) : (
+          ) : (
           <>
-            <TextInput
-              style={[s.cardInput, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]}
-              placeholder="Kart Numarası"
-              placeholderTextColor={c.textMuted}
-              keyboardType="number-pad"
-              maxLength={19}
-              value={cardNumber}
-              onChangeText={(t) => setCardNumber(t.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 '))}
-            />
-            <TextInput
-              style={[s.cardInput, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]}
-              placeholder="Kart Üzerindeki Ad Soyad"
-              placeholderTextColor={c.textMuted}
-              value={cardHolder}
-              onChangeText={setCardHolder}
-            />
-            <View style={s.expireRow}>
-              <TextInput
-                style={[s.cardInput, { flex: 1, backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]}
-                placeholder="Ay (AA)"
-                placeholderTextColor={c.textMuted}
-                keyboardType="number-pad"
-                maxLength={2}
-                value={expireMonth}
-                onChangeText={(t) => setExpireMonth(t.replace(/\D/g, '').slice(0, 2))}
-              />
-              <TextInput
-                style={[s.cardInput, { flex: 1, backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]}
-                placeholder="Yıl (YY)"
-                placeholderTextColor={c.textMuted}
-                keyboardType="number-pad"
-                maxLength={2}
-                value={expireYear}
-                onChangeText={(t) => setExpireYear(t.replace(/\D/g, '').slice(0, 2))}
-              />
-            </View>
-            <TextInput
-              style={[s.cardInput, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]}
-              placeholder="CVC (Kart arkasındaki 3 haneli kod)"
-              placeholderTextColor={c.textMuted}
-              keyboardType="number-pad"
-              maxLength={3}
-              secureTextEntry
-              value={cvc}
-              onChangeText={(t) => setCvc(t.replace(/\D/g, '').slice(0, 3))}
-            />
-            <View style={s.row}>
-              <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: c.border }]} onPress={() => { setShowCardForm(false); setCardNumber(''); setCardHolder(''); setExpireMonth(''); setExpireYear(''); setCvc(''); }} disabled={loading}>
-                <Text style={[s.btnText, { color: c.textSecondary }]}>İptal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: c.accent }]} onPress={handlePayWithCard} disabled={loading}>
-                {loading ? <ActivityIndicator color={c.accentText} /> : (
-                  <Text style={[s.btnText, { color: c.accentText }]}>₺99 Öde</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={[s.btn, { backgroundColor: c.accent }]} onPress={() => setShowCardForm(true)}>
+              <Ionicons name="card-outline" size={20} color={c.accentText} />
+              <Text style={[s.btnText, { color: c.accentText }]}>Abone Ol - ₺99/ay</Text>
+            </TouchableOpacity>
+
+            <Modal visible={showCardForm} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent>
+              <View style={[s.modalWrapper, { backgroundColor: c.background }]}>
+                <View style={[s.modalHeader, { borderBottomColor: c.border }]}>
+                  <Text style={[s.modalTitle, { color: c.text }]}>Kart Bilgileri</Text>
+                  <TouchableOpacity onPress={() => { setShowCardForm(false); setCardNumber(''); setCardHolder(''); setExpireMonth(''); setExpireYear(''); setCvc(''); }}>
+                    <Ionicons name="close" size={26} color={c.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                  <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24 }}>
+                    <TextInput style={[s.cardInput, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Kart Numarası" placeholderTextColor={c.textMuted} keyboardType="number-pad" maxLength={19} value={cardNumber} onChangeText={(t) => setCardNumber(t.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 '))} />
+                    <TextInput style={[s.cardInput, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Kart Üzerindeki Ad Soyad" placeholderTextColor={c.textMuted} value={cardHolder} onChangeText={setCardHolder} />
+                    <View style={s.expireRow}>
+                      <TextInput style={[s.cardInput, { flex: 1, backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Ay (AA)" placeholderTextColor={c.textMuted} keyboardType="number-pad" maxLength={2} value={expireMonth} onChangeText={(t) => setExpireMonth(t.replace(/\D/g, '').slice(0, 2))} />
+                      <TextInput style={[s.cardInput, { flex: 1, backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Yıl (YY)" placeholderTextColor={c.textMuted} keyboardType="number-pad" maxLength={2} value={expireYear} onChangeText={(t) => setExpireYear(t.replace(/\D/g, '').slice(0, 2))} />
+                    </View>
+                    <TextInput style={[s.cardInput, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="CVC (Kart arkasındaki 3 haneli kod)" placeholderTextColor={c.textMuted} keyboardType="number-pad" maxLength={3} secureTextEntry value={cvc} onChangeText={(t) => setCvc(t.replace(/\D/g, '').slice(0, 3))} />
+                  </ScrollView>
+                  <View style={[s.modalFooter, { backgroundColor: c.surface, borderTopColor: c.border }]}>
+                    <TouchableOpacity style={[s.cancelBtn, { backgroundColor: c.border }]} onPress={() => { setShowCardForm(false); setCardNumber(''); setCardHolder(''); setExpireMonth(''); setExpireYear(''); setCvc(''); }} disabled={loading}>
+                      <Text style={[s.cancelBtnText, { color: c.text }]}>İptal</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: c.accent, marginTop: 0 }]} onPress={handlePayWithCard} disabled={loading}>
+                      {loading ? <ActivityIndicator color={c.accentText} /> : <Text style={[s.btnText, { color: c.accentText }]}>₺99 Öde</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </KeyboardAvoidingView>
+              </View>
+            </Modal>
           </>
         )}
       </View>
@@ -261,4 +234,10 @@ const s = StyleSheet.create({
   cardInput: { width: '100%', padding: 12, borderRadius: 8, borderWidth: 1, fontSize: 15, marginTop: 8 },
   expireRow: { flexDirection: 'row', gap: 6 },
   row: { flexDirection: 'row', gap: 6 },
+  modalWrapper: { flex: 1 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 56, paddingBottom: 16, borderBottomWidth: 1 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold' },
+  modalFooter: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1 },
+  cancelBtn: { padding: 14, borderRadius: 8, alignItems: 'center', minWidth: 80 },
+  cancelBtnText: { fontWeight: '600', fontSize: 15 },
 });

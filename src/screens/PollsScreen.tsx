@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -53,29 +53,44 @@ export default function PollsScreen() {
     <ScrollView style={[s.wrapper, { backgroundColor: c.background }]} contentContainerStyle={{ maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%', paddingBottom: 80 }}>
       <View style={s.header}>
         <Text style={[s.title, { color: c.text }]}>Oylamalar</Text>
-        <TouchableOpacity style={[s.addBtn, { backgroundColor: c.accent }]} onPress={() => setShowForm(!showForm)}>
-          <Ionicons name={showForm ? 'close' : 'add'} size={20} color={c.accentText} />
-          <Text style={[s.addBtnText, { color: c.accentText }]}>{showForm ? 'İptal' : 'Yeni Oylama'}</Text>
+        <TouchableOpacity style={[s.addBtn, { backgroundColor: c.accent }]} onPress={() => setShowForm(true)}>
+          <Ionicons name="add" size={20} color={c.accentText} />
+          <Text style={[s.addBtnText, { color: c.accentText }]}>Yeni Oylama</Text>
         </TouchableOpacity>
       </View>
 
-      {showForm && (
-        <View style={[s.form, { backgroundColor: c.surface }]}>
-          <TextInput style={[s.input, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Oylama başlığı" placeholderTextColor={c.textMuted} value={title} onChangeText={setTitle} />
-          <TextInput style={[s.input, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Açıklama" placeholderTextColor={c.textMuted} value={desc} onChangeText={setDesc} multiline />
-          <Text style={[s.label, { color: c.textSecondary }]}>Seçenekler</Text>
-          {options.map((o, i) => (
-            <View key={i} style={s.optRow}>
-              <TextInput style={[s.optInput, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder={`${i + 1}. seçenek`} placeholderTextColor={c.textMuted} value={o} onChangeText={(v) => { const o2 = [...options]; o2[i] = v; setOptions(o2); }} />
-              {options.length > 2 && <TouchableOpacity onPress={() => removeOption(i)}><Ionicons name="close-circle" size={22} color={c.danger} /></TouchableOpacity>}
+      <Modal visible={showForm} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent>
+        <View style={[s.modalWrapper, { backgroundColor: c.background }]}>
+          <View style={[s.modalHeader, { borderBottomColor: c.border }]}>
+            <Text style={[s.modalTitle, { color: c.text }]}>Yeni Oylama</Text>
+            <TouchableOpacity onPress={() => { setShowForm(false); setTitle(''); setDesc(''); setOptions(['', '']); }}>
+              <Ionicons name="close" size={26} color={c.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
+              <TextInput style={[s.input, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Oylama başlığı" placeholderTextColor={c.textMuted} value={title} onChangeText={setTitle} />
+              <TextInput style={[s.input, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder="Açıklama" placeholderTextColor={c.textMuted} value={desc} onChangeText={setDesc} multiline />
+              <Text style={[s.label, { color: c.textSecondary }]}>Seçenekler</Text>
+              {options.map((o, i) => (
+                <View key={i} style={s.optRow}>
+                  <TextInput style={[s.optInput, { backgroundColor: c.surfaceSecondary, borderColor: c.border, color: c.text }]} placeholder={`${i + 1}. seçenek`} placeholderTextColor={c.textMuted} value={o} onChangeText={(v) => { const o2 = [...options]; o2[i] = v; setOptions(o2); }} />
+                  {options.length > 2 && <TouchableOpacity onPress={() => removeOption(i)}><Ionicons name="close-circle" size={22} color={c.danger} /></TouchableOpacity>}
+                </View>
+              ))}
+              <TouchableOpacity style={s.addOpt} onPress={addOption}><Ionicons name="add-circle-outline" size={20} color={c.primaryLight} /><Text style={[s.addOptText, { color: c.primaryLight }]}>Seçenek Ekle</Text></TouchableOpacity>
+            </ScrollView>
+            <View style={[s.modalFooter, { backgroundColor: c.surface, borderTopColor: c.border }]}>
+              <TouchableOpacity style={[s.cancelBtn, { backgroundColor: c.border }]} onPress={() => { setShowForm(false); setTitle(''); setDesc(''); setOptions(['', '']); }}>
+                <Text style={[s.cancelBtnText, { color: c.text }]}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.saveBtn, { backgroundColor: c.accent, flex: 1 }, saving && { opacity: 0.6 }]} onPress={handleCreate} disabled={saving}>
+                <Text style={[s.saveBtnText, { color: c.accentText }]}>{saving ? 'Oluşturuluyor...' : 'Oluştur'}</Text>
+              </TouchableOpacity>
             </View>
-          ))}
-          <TouchableOpacity style={s.addOpt} onPress={addOption}><Ionicons name="add-circle-outline" size={20} color={c.primaryLight} /><Text style={[s.addOptText, { color: c.primaryLight }]}>Seçenek Ekle</Text></TouchableOpacity>
-          <TouchableOpacity style={[s.saveBtn, { backgroundColor: c.accent }, saving && { opacity: 0.6 }]} onPress={handleCreate} disabled={saving}>
-            <Text style={[s.saveBtnText, { color: c.accentText }]}>Oluştur</Text>
-          </TouchableOpacity>
+          </KeyboardAvoidingView>
         </View>
-      )}
+      </Modal>
 
       <View style={s.list}>
         {loading ? <ActivityIndicator size="large" color={c.primary} style={{ marginTop: 48 }} /> :
@@ -125,6 +140,12 @@ const s = StyleSheet.create({
   addOptText: { fontSize: 14 },
   saveBtn: { padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 12 },
   saveBtnText: { fontWeight: 'bold', fontSize: 15 },
+  modalWrapper: { flex: 1 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 56, paddingBottom: 16, borderBottomWidth: 1 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold' },
+  modalFooter: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1 },
+  cancelBtn: { padding: 14, borderRadius: 8, alignItems: 'center', minWidth: 80 },
+  cancelBtnText: { fontWeight: '600', fontSize: 15 },
   list: { paddingHorizontal: 24 },
   empty: { alignItems: 'center', paddingVertical: 48 },
   emptyText: { marginTop: 8, fontSize: 14 },
