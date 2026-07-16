@@ -29,16 +29,20 @@ export default function BuildingScreen() {
         setName(b.name || '');
         setAddress(b.address || '');
         setMonthlyDues(String(b.monthly_dues || 0));
-        loadInviteCode();
+      }).catch(() => {
+        showToast('Apartman bilgileri yüklenemedi', 'error');
       });
+      loadInviteCode();
     }
   }, [user?.building_id]);
 
   const loadInviteCode = async () => {
     try {
       const res = await api.auth.getInviteCode();
-      setInviteCode(res.inviteCode);
-    } catch {}
+      setInviteCode(res.inviteCode || res.invite_code || '');
+    } catch (e: any) {
+      showToast(e.message || 'Davet kodu alınamadı', 'error');
+    }
   };
 
   const handleSave = async () => {
