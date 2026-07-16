@@ -36,7 +36,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ showToast, showLoading, hideLoading, isLoading: !!loadingMsg }}>
       {children}
       {toasts.map((t, i) => (
-        <View key={t.id} style={[s.toast, s[`toast${t.type}`], { top: 20, right: 20, left: undefined as any, maxWidth: 400 }]}>
+        <View key={t.id} style={[s.toast, s[`toast${t.type}`]]}>
           <Ionicons
             name={t.type === 'success' ? 'checkmark-circle' : t.type === 'error' ? 'alert-circle' : 'information-circle'}
             size={18}
@@ -61,13 +61,22 @@ export const useToast = () => useContext(ToastContext);
 const s = StyleSheet.create({
   toast: {
     position: 'absolute',
+    top: 60,
+    alignSelf: 'center',
     zIndex: 9999,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    padding: 12,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
     elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    maxWidth: '90%',
+    minWidth: 200,
   },
   toastsuccess: { backgroundColor: '#d1fae5' },
   toasterror: { backgroundColor: '#fee2e2' },
